@@ -1,0 +1,62 @@
+name: "Create ECR Repository"
+description: "Creates an ECR Repository if it doesn't already exist"
+author: "Martyn Crow <martyn.crow@vodafone.com>"
+branding:
+  color: blue
+  icon: anchor
+inputs:
+  role-to-assume:
+    description: ""
+    required: true
+  role-session-name:
+    description: ""
+    required: true
+    default: "GitHub_to_AWS_via_FederatedOIDC"
+  aws-region:
+    description: 'AWS region to use (default: eu-west-1)'
+    required: true
+    default: eu-west-1
+  repo_names:
+    required: true
+    description: "Names of the repositories to create. Provide a comma-separated list if creating multiple repositories."
+  project_name:
+    description: "Optional. Specify the project name to organize repositories. If not provided, repositories will be created without a project association."
+    default: ""
+    required: false
+  ecr_namespaces:
+    description: "Optional. Specify ECR namespaces to organize repositories. Provide a list of namespaces. If not provided, repositories will be created without a namespace association."
+    default: '[]'
+    required: false
+  additional_aws_account_ids:
+    description: "Optional. Specify additional AWS account IDs to access with the repositories. Provide a list of account IDs. If not provided, repositories will be accessed only from the same account."
+    default: '[]'
+    required: false
+  tags:
+    description: "Optional. Specify tags for the repositories. Provide a JSON object with key-value pairs."
+    default: '[]'
+    required: false
+
+runs:
+  using: composite
+  steps:
+
+    - name: Configure AWS Credentials (iam user)
+      uses: VFGroup-VBIT/vbitdc-opf-actions/aws/install-cli-action@main
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        role-session-name: ${{ inputs.role-session-name }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - id: create-repo
+      shell: bash
+      run: |
+        echo $ECR_NAMESPACE
+        pip install boto3
+        python3 $GITHUB_ACTION_PATH/ecr.py 
+      env:
+        AWS_REGION: ${{ inputs.aws-region }}
+        REPO_NAMES: ${{ inputs.repo_names }}
+        ECR_NAMESPACES: ${{ inputs.ecr_namespaces }}
+        PROJECT_NAME: ${{ inputs.project_name }}
+        ADDITIONAL_AWS_ACCOUNT_IDS: ${{ inputs.additional_aws_account_ids }}
+        TAGS: ${{ inputs.tags }}
