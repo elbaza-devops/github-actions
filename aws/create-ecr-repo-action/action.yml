@@ -41,7 +41,7 @@ runs:
   steps:
 
     - name: Configure AWS Credentials (iam user)
-      uses: VFGroup-VBIT/vbitdc-opf-actions/aws/install-cli-action@main
+      uses: elbaza-devops/github-actions/aws/install-cli-action@main
       with:
         role-to-assume: ${{ inputs.role-to-assume }}
         role-session-name: ${{ inputs.role-session-name }}
