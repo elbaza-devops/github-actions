@@ -47,11 +47,11 @@ runs:
         role-session-name: ${{ inputs.role-session-name }}
         aws-region: ${{ inputs.aws-region }}
 
-    - name: Install Python3 and pip
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3 python3-pip
+    # - name: Install Python3 and pip
+    #   shell: bash
+    #   run: |
+    #     sudo apt-get update
+    #     sudo apt-get install -y python3 python3-pip
 
     - id: create-repo
       shell: bash
