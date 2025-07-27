@@ -1,6 +1,5 @@
 name: "Create ECR Repository"
 description: "Creates an ECR Repository if it doesn't already exist"
-author: "Martyn Crow <martyn.crow@vodafone.com>"
 branding:
   color: blue
   icon: anchor
