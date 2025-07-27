@@ -11,7 +11,7 @@ jobs:
 
       # Step 1: Authenticate to Azure Artifacts npm feed
       - name: Azure Artifacts NPM Login
-        uses: ./.github/actions/azure-artifacts-npm-auth  # using the composite action from this repo
+        uses: ./azure-artifacts-npm-auth  # using the composite action from this repo
         with:
           azure_pat: ${{ secrets.AZURE_ARTIFACTS_PAT }}   # Azure DevOps PAT stored in GitHub secrets
           org: contoso                                   # Azure DevOps organization name
