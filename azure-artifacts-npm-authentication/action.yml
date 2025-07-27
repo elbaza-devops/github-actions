@@ -1,0 +1,80 @@
+name: "Azure Artifacts NPM Auth"
+description: "Composite action to authenticate npm to Azure Artifacts feeds via .npmrc"
+inputs:
+  azure_pat:
+    description: "Azure DevOps Personal Access Token (PAT) for Azure Artifacts (use a GitHub secret)"
+    required: true
+    type: string
+    secret: true
+  org:
+    description: "Azure DevOps organization name (e.g. contoso if URL is dev.azure.com/contoso)"
+    required: true
+    type: string
+  project:
+    description: "Azure DevOps project name (if feed is project-scoped; omit for org-scoped feeds)"
+    required: false
+    type: string
+  feed:
+    description: "Azure Artifacts feed name (the feed containing the npm packages)"
+    required: true
+    type: string
+  scope:
+    description: "Optional npm scope (without @) for packages in this feed"
+    required: false
+    type: string
+  npmrc_path:
+    description: "Path to the .npmrc file to use or create"
+    required: false
+    type: string
+    default: ".npmrc"
+runs:
+  using: "composite"
+  steps:
+    - name: Configure .npmrc for Azure Artifacts
+      shell: bash
+      env:
+        AZURE_PAT: ${{ inputs.azure_pat }}
+        ORG: ${{ inputs.org }}
+        PROJECT: ${{ inputs.project }}
+        FEED: ${{ inputs.feed }}
+        SCOPE: ${{ inputs.scope }}
+        NPMRC_PATH: ${{ inputs.npmrc_path }}
+      run: |
+        # Create .npmrc if it doesn't exist
+        if [ ! -f "$NPMRC_PATH" ]; then
+          touch "$NPMRC_PATH"
+          echo "# .npmrc created by Azure Artifacts Auth Action" >> "$NPMRC_PATH"
+        fi
+
+        # Construct the Azure Artifacts registry URL
+        REGISTRY_URL="https://pkgs.dev.azure.com/$ORG"
+        if [ -n "$PROJECT" ]; then
+          REGISTRY_URL="$REGISTRY_URL/$PROJECT"
+        fi
+        REGISTRY_URL="$REGISTRY_URL/_packaging/$FEED/npm/registry/"
+
+        # Add scope-specific registry mapping if scope is provided, otherwise set global registry
+        if [ -n "$SCOPE" ]; then
+          grep -q "^@${SCOPE}:registry=" "$NPMRC_PATH" || echo "@${SCOPE}:registry=${REGISTRY_URL}" >> "$NPMRC_PATH"
+        else
+          grep -q "^registry=" "$NPMRC_PATH" || echo "registry=${REGISTRY_URL}" >> "$NPMRC_PATH"
+        fi
+
+        # Ensure always-auth is true for the Azure registry
+        grep -q "^always-auth=" "$NPMRC_PATH" || echo "always-auth=true" >> "$NPMRC_PATH"
+
+        # Remove any existing Azure Artifacts credentials for this feed (to avoid duplicates)
+        sed -i.bak "/_packaging\/${FEED}\/npm\//d" "$NPMRC_PATH"
+
+        # Encode the PAT in base64 (required for Azure Artifacts npm authentication)
+        PAT_BASE64=$(echo -n "$AZURE_PAT" | base64)
+
+        # Append authentication token lines to .npmrc
+        echo "; begin Azure Artifacts auth token" >> "$NPMRC_PATH"
+        echo "//pkgs.dev.azure.com/$ORG${PROJECT:+/$PROJECT}/_packaging/$FEED/npm/registry/:username=AzureDevOps" >> "$NPMRC_PATH"
+        echo "//pkgs.dev.azure.com/$ORG${PROJECT:+/$PROJECT}/_packaging/$FEED/npm/registry/:_password=${PAT_BASE64}" >> "$NPMRC_PATH"
+        echo "//pkgs.dev.azure.com/$ORG${PROJECT:+/$PROJECT}/_packaging/$FEED/npm/registry/:email=npm@example.com" >> "$NPMRC_PATH"
+        echo "//pkgs.dev.azure.com/$ORG${PROJECT:+/$PROJECT}/_packaging/$FEED/npm/:username=AzureDevOps" >> "$NPMRC_PATH"
+        echo "//pkgs.dev.azure.com/$ORG${PROJECT:+/$PROJECT}/_packaging/$FEED/npm/:_password=${PAT_BASE64}" >> "$NPMRC_PATH"
+        echo "//pkgs.dev.azure.com/$ORG${PROJECT:+/$PROJECT}/_packaging/$FEED/npm/:email=npm@example.com" >> "$NPMRC_PATH"
+        echo "; end Azure Artifacts auth token" >> "$NPMRC_PATH"

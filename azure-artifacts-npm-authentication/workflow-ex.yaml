@@ -1,0 +1,34 @@
+name: AzureArtifactsNpmExample
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # Step 1: Authenticate to Azure Artifacts npm feed
+      - name: Azure Artifacts NPM Login
+        uses: ./.github/actions/azure-artifacts-npm-auth  # using the composite action from this repo
+        with:
+          azure_pat: ${{ secrets.AZURE_ARTIFACTS_PAT }}   # Azure DevOps PAT stored in GitHub secrets
+          org: contoso                                   # Azure DevOps organization name
+          project: MyProject                              # project name (omit if feed is org-scoped)
+          feed: my-feed                                   # Azure Artifacts feed name
+          scope: myscope                                  # npm scope (omit for global registry)
+
+      # Step 2: Install dependencies (private packages from Azure Artifacts will authenticate using the .npmrc)
+      - name: Install Dependencies
+        run: npm install
+
+      # (Optional) run any build or test steps here
+      - run: npm run build
+
+      # Step 3: Publish package to Azure Artifacts (if on main branch, for example)
+      - name: Publish Package
+        if: github.ref == 'refs/heads/main'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish
