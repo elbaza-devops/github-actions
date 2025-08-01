@@ -18,9 +18,9 @@ on:
       AWS_OIDC_ROLE:
         description: 'Role ARN for OIDC'
         required: true
-      # GITHUB_PAT:
-      #   description: 'Role ARN for OIDC'
-      #   required: true
+      REPO_PAT:
+        description: 'Github PAT'
+        required: true
 
 permissions:
   id-token: write
@@ -91,12 +91,19 @@ jobs:
                        $REG/$DST_ENV/$SERVICE:$DST_TAG
           docker push  $REG/$DST_ENV/$SERVICE:$DST_TAG
 
-      # - name: Image Updater
-      #   run: |
-      #     python .github/scripts/gitops_update.py \
-      #       --repo-url "${{ inputs.gitops-repo-url }}" \
-      #       --service "${{ inputs.service-name }}" \
-      #       --environment "${{ inputs.environment }}" \
-      #       --tag "${{ env.DST_TAG }}"
-      #   env:
-      #     GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+      - name: Checkout cep-actions-hub
+        uses: actions/checkout@v4
+        with:
+          repository: elbaza-devops/github-actions
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Image Updater
+        run: |
+          python gitops_update.py \
+            --repo-url "${{ inputs.gitops-repo-url }}" \
+            --service "${{ inputs.service-name }}" \
+            --environment "${{ inputs.environment }}" \
+            --tag "${{ env.DST_TAG }}"
+        env:
+          GITHUB_PAT: ${{ secrets.REPO_PAT }}
+        working-directory: ./github-actions/scripts
