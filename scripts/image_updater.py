@@ -11,10 +11,16 @@ Usage:
     --tag          staging-abc1234
 """
 
-import argparse, logging, os, subprocess, sys, tempfile
+import argparse
+import logging
+import os
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
-from github import Github, Auth  # pip install PyGithub
+
+from github import Github       # pip install PyGithub
 import yaml                     # pip install PyYAML
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -33,28 +39,32 @@ def update_values(base_dir, service, env, tag):
     logging.info(f"Set image.tag={tag} in {vals}")
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--repo-url",    required=True, help="GitOps repo HTTPS URL")
-    p.add_argument("--service",     required=True, help="Microservice name")
-    p.add_argument("--environment", required=True,
-                   choices=["dev","staging","prod"], help="Target env")
-    p.add_argument("--tag",         required=True, help="New image tag")
-    args = p.parse_args()
+    parser = argparse.ArgumentParser(
+        description='Clone GitOps repo, update image tag, push or PR.'
+    )
+    parser.add_argument("--repo-url",    required=True, help="GitOps repo HTTPS URL")
+    parser.add_argument("--service",     required=True, help="Microservice name")
+    parser.add_argument("--environment", required=True,
+                        choices=["dev", "staging", "prod"], help="Target env")
+    parser.add_argument("--tag",         required=True, help="New image tag")
+    args = parser.parse_args()
 
     token = os.getenv("GITOPS_PAT")
     if not token:
         logging.error("GITOPS_PAT not set")
         sys.exit(1)
 
-    # derive owner/repo
-    url = urlparse(args.repo_url)
-    full = url.path.lstrip("/").removesuffix(".git")
-    gh   = Github(Auth.Token(token))
-    repo = gh.get_repo(full)
+    # derive owner/repo from URL
+    parsed = urlparse(args.repo_url)
+    repo_full = parsed.path.lstrip("/").removesuffix(".git")
+
+    # authenticate
+    gh = Github(token)
+    repo = gh.get_repo(repo_full)
     main_branch = repo.default_branch
 
-    is_prod = args.environment == "prod"
-    branch  = main_branch if not is_prod else f"update-{args.service}-{args.tag}"
+    is_prod = (args.environment == "prod")
+    branch = main_branch if not is_prod else f"update-{args.service}-{args.tag}"
 
     with tempfile.TemporaryDirectory() as tmp:
         logging.info(f"Cloning {args.repo_url}")
@@ -72,8 +82,8 @@ def main():
         update_values(tmp, args.service, args.environment, args.tag)
 
         run("git add .", cwd=tmp)
-        commit_msg = f"ci: update {args.service} {args.environment} tag to {args.tag}"
-        run(f'git commit -m "{commit_msg}"', cwd=tmp)
+        msg = f"ci: update {args.service} {args.environment} tag to {args.tag}"
+        run(f'git commit -m "{msg}"', cwd=tmp)
 
         logging.info(f"Pushing changes to {branch}")
         run(f"git push origin {branch}", cwd=tmp)
@@ -81,7 +91,7 @@ def main():
         if is_prod:
             logging.info("Opening pull request")
             pr = repo.create_pull(
-                title=commit_msg,
+                title=msg,
                 body="Automated image-tag update",
                 head=branch,
                 base=main_branch
