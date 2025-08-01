@@ -115,8 +115,8 @@ jobs:
           python3 image_updater.py \
             --repo-url "https://github.com/elbaza-devops/elbaza-gitops.git" \
             --service "ai-server" \
-            --environment "dev" \
-            --tag "dev-cdsx231"
+            --environment "prod" \
+            --tag "v1.0.0"
         env:
           GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
         working-directory: ./github-actions/scripts
