@@ -44,6 +44,16 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Ensure ECR repo & namespace exist
+        uses: elbaza-devops/github-actions/aws/create-ecr-repo-action@main
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          repo_names: '["${{ inputs.service-name }}"]'
+          ecr_namespaces: '["${{ inputs.environment }}"]'
+          tags: |
+            [{"Key":"Environment","Value":"${{ env.ENV }}"}]
+
       - name: Determine promotion parameters
         run: |
           ENV="${{ inputs.environment }}"
