@@ -101,8 +101,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # - name: Derive image tag & export to env
+      # - name: Image Updater
       #   run: |
-      #     SHORT_SHA=$(git rev-parse --short HEAD)
-      #     echo "ENV=dev"                >> $GITHUB_ENV
-      #     echo "IMAGE_TAG=dev-${SHORT_SHA}" >> $GITHUB_ENV
+      #     python .github/scripts/gitops_update.py \
+      #       --repo-url "${{ inputs.gitops-repo-url }}" \
+      #       --service "${{ inputs.service-name }}" \
+      #       --environment "${{ inputs.environment }}" \
+      #       --tag "${{ env.DST_TAG }}"
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
