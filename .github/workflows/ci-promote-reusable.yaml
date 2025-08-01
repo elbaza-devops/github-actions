@@ -68,7 +68,8 @@ jobs:
             DST_TAG="staging-${SHA}"
           else
             SRC_ENV=staging
-            DST_TAG=$(git fetch --tags && git describe --tags --abbrev=0)
+            LATEST=$(git describe --tags "$(git rev-list --tags --max-count=1)")
+            echo "DST_TAG=${LATEST}" >> $GITHUB_ENV
           fi
 
           echo "SRC_ENV=${SRC_ENV}" >> $GITHUB_ENV
