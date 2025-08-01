@@ -36,6 +36,8 @@ jobs:
         with:
           fetch-depth: 0        # fetch all history, not just the last commit
           tags: true
+      - name: List fetched tags
+        run: git tag
 
       - name: Configure AWS credentials (OIDC)
         uses: elbaza-devops/github-actions/aws/install-cli-action@main
