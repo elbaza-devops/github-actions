@@ -104,13 +104,15 @@ jobs:
       - name: Checkout github-actions
         uses: actions/checkout@v4
         with:
+          repository: elbaza-devops/github-actions
+          token: ${{ secrets.GITOPS_PAT }}
           path: github-actions
 
       - name: Image Updater
         run: |
-          python -m pip install --upgrade pip
+          python3 -m pip install --upgrade pip
           pip install PyGithub PyYAML
-          python image_updater.py \
+          python3 image_updater.py \
             --repo-url "https://github.com/elbaza-devops/github-actions.git" \
             --service "ai-server" \
             --environment "dev" \
