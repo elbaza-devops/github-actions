@@ -1,69 +1,94 @@
 #!/usr/bin/env python3
-import argparse, os, sys
+"""
+Clone a GitOps repo, update configs/<service>/<environment>/values.yaml
+to set image.tag, then commit (non-prod) or PR (prod).
+
+Usage:
+  python image_updater.py \
+    --repo-url     https://github.com/ORG/GITOPS.git \
+    --service      ai-server \
+    --environment  staging \
+    --tag          staging-abc1234
+"""
+
+import argparse, logging, os, subprocess, sys, tempfile
+from pathlib import Path
 from urllib.parse import urlparse
-from github import Github
-import yaml
+from github import Github, Auth  # pip install PyGithub
+import yaml                     # pip install PyYAML
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+def run(cmd, cwd):
+    subprocess.run(cmd, cwd=cwd, shell=True, check=True)
+
+def update_values(base_dir, service, env, tag):
+    vals = Path(base_dir) / "configs" / service / env / "values.yaml"
+    if not vals.exists():
+        logging.error(f"Missing values file: {vals}")
+        sys.exit(1)
+    data = yaml.safe_load(vals.read_text())
+    data.setdefault("image", {})["tag"] = tag
+    vals.write_text(yaml.dump(data, sort_keys=False))
+    logging.info(f"Set image.tag={tag} in {vals}")
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--repo-url",     required=True,
-                   help="HTTPS URL of the GitOps repo")
-    p.add_argument("--service",      required=True)
-    p.add_argument("--environment",  required=True)
-    p.add_argument("--tag",          required=True)
+    p.add_argument("--repo-url",    required=True, help="GitOps repo HTTPS URL")
+    p.add_argument("--service",     required=True, help="Microservice name")
+    p.add_argument("--environment", required=True,
+                   choices=["dev","staging","prod"], help="Target env")
+    p.add_argument("--tag",         required=True, help="New image tag")
     args = p.parse_args()
 
-    token = os.getenv("GITHUB_PAT")
+    token = os.getenv("GITHUB_TOKEN")
     if not token:
-        print("❌ GITHUB_PAT is required", file=sys.stderr)
+        logging.error("GITHUB_TOKEN not set")
         sys.exit(1)
 
-    # Parse owner/repo from URL
-    parsed = urlparse(args.repo_url)
-    repo_full = parsed.path.lstrip("/").removesuffix(".git")
+    # derive owner/repo
+    url = urlparse(args.repo_url)
+    full = url.path.lstrip("/").removesuffix(".git")
+    gh   = Github(Auth.Token(token))
+    repo = gh.get_repo(full)
+    main_branch = repo.default_branch
 
-    gh   = Github(token)
-    repo = gh.get_repo(repo_full)
-    default_branch = repo.default_branch
+    is_prod = args.environment == "prod"
+    branch  = main_branch if not is_prod else f"update-{args.service}-{args.tag}"
 
-    # For prod, create a feature branch; otherwise update main directly
-    if args.environment == "prod":
-        branch_name = f"update-{args.service}-{args.environment}-{args.tag}"
-        src = repo.get_git_ref(f"heads/{default_branch}")
-        repo.create_git_ref(f"refs/heads/{branch_name}", src.object.sha)
-        target_branch = branch_name
-    else:
-        target_branch = default_branch
+    with tempfile.TemporaryDirectory() as tmp:
+        logging.info(f"Cloning {args.repo_url}")
+        run(f"git clone {args.repo_url} .", cwd=tmp)
 
-    # Load and modify values.yaml
-    path = f"configs/{args.service}/{args.environment}/values.yaml"
-    contents = repo.get_contents(path, ref=target_branch)
-    data = yaml.safe_load(contents.decoded_content)
+        if is_prod:
+            logging.info(f"Creating branch {branch}")
+            run(f"git checkout -b {branch} origin/{main_branch}", cwd=tmp)
+        else:
+            run(f"git checkout {main_branch}", cwd=tmp)
 
-    data.setdefault("image", {})
-    data["image"]["tag"] = args.tag
-    new_yaml = yaml.dump(data, sort_keys=False)
+        run('git config user.name "github-actions"', cwd=tmp)
+        run('git config user.email "actions@github.com"', cwd=tmp)
 
-    commit_msg = f"ci: update {args.service} {args.environment} image tag to {args.tag}"
-    repo.update_file(
-        path=path,
-        message=commit_msg,
-        content=new_yaml,
-        sha=contents.sha,
-        branch=target_branch
-    )
+        update_values(tmp, args.service, args.environment, args.tag)
 
-    # If prod, open a PR; else just print success
-    if args.environment == "prod":
-        pr = repo.create_pull(
-            title=commit_msg,
-            body="Please review and merge to apply the image update.",
-            head=branch_name,
-            base=default_branch
-        )
-        print(f"✅ Created pull request: {pr.html_url}")
-    else:
-        print(f"✅ Committed {path} on branch {target_branch}")
+        run("git add .", cwd=tmp)
+        commit_msg = f"ci: update {args.service} {args.environment} tag to {args.tag}"
+        run(f'git commit -m "{commit_msg}"', cwd=tmp)
+
+        logging.info(f"Pushing changes to {branch}")
+        run(f"git push origin {branch}", cwd=tmp)
+
+        if is_prod:
+            logging.info("Opening pull request")
+            pr = repo.create_pull(
+                title=commit_msg,
+                body="Automated image-tag update",
+                head=branch,
+                base=main_branch
+            )
+            logging.info(f"✅ PR created: {pr.html_url}")
+        else:
+            logging.info("✅ Changes committed directly to main")
 
 if __name__ == "__main__":
     main()
