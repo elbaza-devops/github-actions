@@ -7,8 +7,8 @@ Usage:
   python image_updater.py \
     --repo-url     https://github.com/ORG/GITOPS.git \
     --service      ai-server \
-    --environment  staging \
-    --tag          staging-abc1234
+    --environment  dev \
+    --tag          dev-abc1234
 """
 
 import argparse
@@ -25,8 +25,10 @@ import yaml                     # pip install PyYAML
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
+
 def run(cmd, cwd):
     subprocess.run(cmd, cwd=cwd, shell=True, check=True)
+
 
 def update_values(base_dir, service, env, tag):
     vals = Path(base_dir) / "configs" / service / env / "values.yaml"
@@ -37,6 +39,7 @@ def update_values(base_dir, service, env, tag):
     data.setdefault("image", {})["tag"] = tag
     vals.write_text(yaml.dump(data, sort_keys=False))
     logging.info(f"Set image.tag={tag} in {vals}")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -54,11 +57,17 @@ def main():
         logging.error("GITOPS_PAT not set")
         sys.exit(1)
 
-    # derive owner/repo from URL
+    # Build an auth-URL so both clone and push use your PAT
+    auth_url = args.repo_url.replace(
+        "https://",
+        f"https://x-access-token:{token}@"
+    )
+
+    # derive owner/repo from URL for PyGithub
     parsed = urlparse(args.repo_url)
     repo_full = parsed.path.lstrip("/").removesuffix(".git")
 
-    # authenticate
+    # authenticate GitHub API
     gh = Github(token)
     repo = gh.get_repo(repo_full)
     main_branch = repo.default_branch
@@ -68,7 +77,7 @@ def main():
 
     with tempfile.TemporaryDirectory() as tmp:
         logging.info(f"Cloning {args.repo_url}")
-        run(f"git clone {args.repo_url} .", cwd=tmp)
+        run(f"git clone {auth_url} .", cwd=tmp)
 
         if is_prod:
             logging.info(f"Creating branch {branch}")
@@ -76,18 +85,23 @@ def main():
         else:
             run(f"git checkout {main_branch}", cwd=tmp)
 
+        # set Git identity
         run('git config user.name "github-actions"', cwd=tmp)
         run('git config user.email "actions@github.com"', cwd=tmp)
 
+        # update the values file
         update_values(tmp, args.service, args.environment, args.tag)
 
+        # commit
         run("git add .", cwd=tmp)
         msg = f"ci: update {args.service} {args.environment} tag to {args.tag}"
         run(f'git commit -m "{msg}"', cwd=tmp)
 
+        # push with auth
         logging.info(f"Pushing changes to {branch}")
-        run(f"git push origin {branch}", cwd=tmp)
+        run(f"git push {auth_url} {branch}", cwd=tmp)
 
+        # open PR for prod
         if is_prod:
             logging.info("Opening pull request")
             pr = repo.create_pull(
@@ -99,6 +113,7 @@ def main():
             logging.info(f"✅ PR created: {pr.html_url}")
         else:
             logging.info("✅ Changes committed directly to main")
+
 
 if __name__ == "__main__":
     main()
