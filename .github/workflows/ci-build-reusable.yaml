@@ -99,7 +99,7 @@ jobs:
 
   Postbuild:
     # needs: Build
-    runs-on: ubuntu
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout github-actions
         uses: actions/checkout@v4
