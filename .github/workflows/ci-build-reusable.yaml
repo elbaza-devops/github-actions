@@ -108,9 +108,9 @@ jobs:
 
       - name: Image Updater
         run: |
-          python3 -m pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install PyGithub PyYAML
-          python3 image_updater.py \
+          python image_updater.py \
             --repo-url "https://github.com/elbaza-devops/github-actions.git" \
             --service "ai-server" \
             --environment "dev" \
