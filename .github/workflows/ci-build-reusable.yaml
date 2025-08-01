@@ -10,6 +10,9 @@ on:
       AWS_OIDC_ROLE:
         description: 'Role ARN for OIDC'
         required: true
+      GITOPS_PAT:
+        description: 'GitHub Token'
+        required: true
 
 permissions:
   id-token: write
@@ -101,12 +104,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # - name: Image Updater
-      #   run: |
-      #     python .github/scripts/gitops_update.py \
-      #       --repo-url "${{ inputs.gitops-repo-url }}" \
-      #       --service "${{ inputs.service-name }}" \
-      #       --environment "${{ inputs.environment }}" \
-      #       --tag "${{ env.DST_TAG }}"
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image Updater
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install PyGithub PyYAML
+          python3 .github/scripts/gitops_update.py \
+            --repo-url "https://github.com/elbaza-devops/github-actions.git" \
+            --service "ai-server" \
+            --environment "dev" \
+            --tag "dev-hsg221"
+        env:
+          GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
