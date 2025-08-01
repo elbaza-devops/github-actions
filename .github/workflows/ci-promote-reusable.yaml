@@ -36,8 +36,6 @@ jobs:
         with:
           fetch-depth: 0        # fetch all history, not just the last commit
           tags: true
-      - name: List fetched tags
-        run: git tag
 
       - name: Configure AWS credentials (OIDC)
         uses: elbaza-devops/github-actions/aws/install-cli-action@main
@@ -70,8 +68,7 @@ jobs:
             DST_TAG="staging-${SHA}"
           else
             SRC_ENV=staging
-            LATEST=$(git tag --sort=-creatordate | head -n1)
-            echo "DST_TAG=${LATEST}" >> $GITHUB_ENV
+            DST_TAG=$(git tag --sort=-version:refname | head -n1)
           fi
 
           echo "SRC_ENV=${SRC_ENV}" >> $GITHUB_ENV
