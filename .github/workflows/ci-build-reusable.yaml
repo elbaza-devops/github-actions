@@ -117,4 +117,4 @@ jobs:
             --tag "dev-hsg221"
         env:
           GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
-        working-directory: github-actions
+        working-directory: github-actions/scripts
