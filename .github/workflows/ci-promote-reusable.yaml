@@ -18,6 +18,9 @@ on:
       AWS_OIDC_ROLE:
         description: 'Role ARN for OIDC'
         required: true
+      GITHUB_TOKEN:
+        description: 'Role ARN for OIDC'
+        required: true
 
 permissions:
   id-token: write
@@ -87,3 +90,13 @@ jobs:
           docker tag   $REG/$SRC_ENV/$SERVICE:$SRC_TAG \
                        $REG/$DST_ENV/$SERVICE:$DST_TAG
           docker push  $REG/$DST_ENV/$SERVICE:$DST_TAG
+
+      # - name: Image Updater
+      #   run: |
+      #     python .github/scripts/gitops_update.py \
+      #       --repo-url "${{ inputs.gitops-repo-url }}" \
+      #       --service "${{ inputs.service-name }}" \
+      #       --environment "${{ inputs.environment }}" \
+      #       --tag "${{ env.DST_TAG }}"
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
