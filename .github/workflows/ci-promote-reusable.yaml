@@ -18,9 +18,9 @@ on:
       AWS_OIDC_ROLE:
         description: 'Role ARN for OIDC'
         required: true
-      GITHUB_TOKEN:
-        description: 'Role ARN for OIDC'
-        required: true
+      # GITHUB_PAT:
+      #   description: 'Role ARN for OIDC'
+      #   required: true
 
 permissions:
   id-token: write
@@ -99,4 +99,4 @@ jobs:
       #       --environment "${{ inputs.environment }}" \
       #       --tag "${{ env.DST_TAG }}"
       #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
