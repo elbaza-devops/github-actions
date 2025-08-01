@@ -1,0 +1,79 @@
+# .github/workflows/ci-promote-reusable.yml
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: 'Name of the microservice (e.g. ai-server)'
+        required: true
+        type: string
+      environment:
+        description: 'Target env for promotion (staging|prod)'
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+      tag:
+        description: 'Old tag to promote (e.g. dev-abc1234 or staging-abc1234)'
+        required: true
+        type: string
+    secrets:
+      AWS_OIDC_ROLE:
+        description: 'Role ARN for OIDC'
+        required: true
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  Promote:
+    runs-on: arc-runner-set
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: elbaza-devops/github-actions/aws/install-cli-action@main
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Determine promotion parameters
+        run: |
+          ENV="${{ inputs.environment }}"
+          SRC_TAG="${{ inputs.tag }}"
+
+          if [[ "$ENV" == "staging" ]]; then
+            SRC_ENV=dev
+            SHA="${SRC_TAG#dev-}"
+            DST_TAG="staging-${SHA}"
+          else
+            SRC_ENV=staging
+            DST_TAG=$(git fetch --tags && git describe --tags --abbrev=0)
+          fi
+
+          echo "SRC_ENV=${SRC_ENV}" >> $GITHUB_ENV
+          echo "DST_TAG=${DST_TAG}" >> $GITHUB_ENV
+
+      - name: Promote ${{ inputs.tag }} from ${{ env.SRC_ENV }} to ${{ inputs.environment }} as ${{ env.DST_TAG }}
+        run: |
+          REG=${{ steps.login-ecr.outputs.registry }}
+          SERVICE="${{ inputs.service-name }}"
+          SRC_ENV=${{ env.SRC_ENV }}
+          DST_ENV="${{ inputs.environment }}"
+          SRC_TAG="${{ inputs.tag }}"
+          DST_TAG="${{ env.DST_TAG }}"
+
+          docker pull  $REG/$SRC_ENV/$SERVICE:$SRC_TAG
+          docker tag   $REG/$SRC_ENV/$SERVICE:$SRC_TAG \
+                       $REG/$DST_ENV/$SERVICE:$DST_TAG
+          docker push  $REG/$DST_ENV/$SERVICE:$DST_TAG
