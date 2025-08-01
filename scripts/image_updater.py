@@ -41,9 +41,9 @@ def main():
     p.add_argument("--tag",         required=True, help="New image tag")
     args = p.parse_args()
 
-    token = os.getenv("GITHUB_TOKEN")
+    token = os.getenv("GITOPS_PAT")
     if not token:
-        logging.error("GITHUB_TOKEN not set")
+        logging.error("GITOPS_PAT not set")
         sys.exit(1)
 
     # derive owner/repo
