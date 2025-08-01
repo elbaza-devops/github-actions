@@ -9,10 +9,7 @@ on:
       environment:
         description: 'Target env for promotion (staging|prod)'
         required: true
-        type: choice
-        options:
-          - staging
-          - prod
+        type: string
       tag:
         description: 'Old tag to promote (e.g. dev-abc1234 or staging-abc1234)'
         required: true
