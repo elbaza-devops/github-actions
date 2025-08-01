@@ -22,87 +22,89 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  Prebuild:
-    runs-on: arc-runner-set
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # Prebuild:
+  #   runs-on: arc-runner-set
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Download Trivy HTML Template
-        run: |
-          mkdir -p contrib
-          sudo curl -sSL -o /usr/bin/html.tpl \
-            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+  #     - name: Download Trivy HTML Template
+  #       run: |
+  #         mkdir -p contrib
+  #         sudo curl -sSL -o /usr/bin/html.tpl \
+  #           https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
-      - name: Run Trivy FS Scan
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: template
-          template: "@/usr/bin/html.tpl"
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          scanners: vuln,secret,misconfig,license
-          output: trivy-report-${{ github.run_id }}.html
-          trivy-config: ${{ github.workspace }}/${{ github.repository }}/trivy-config.yaml
+  #     - name: Run Trivy FS Scan
+  #       uses: aquasecurity/trivy-action@0.30.0
+  #       with:
+  #         scan-type: fs
+  #         scan-ref: .
+  #         format: template
+  #         template: "@/usr/bin/html.tpl"
+  #         ignore-unfixed: true
+  #         vuln-type: os,library
+  #         severity: CRITICAL,HIGH
+  #         scanners: vuln,secret,misconfig,license
+  #         output: trivy-report-${{ github.run_id }}.html
+  #         trivy-config: ${{ github.workspace }}/${{ github.repository }}/trivy-config.yaml
 
-      - name: Upload Trivy FS Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-report-${{ github.run_id }}
-          path: trivy-report-${{ github.run_id }}.html
+  #     - name: Upload Trivy FS Report
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: trivy-report-${{ github.run_id }}
+  #         path: trivy-report-${{ github.run_id }}.html
 
-  Build:
-    needs: Prebuild
-    runs-on: arc-runner-set
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # Build:
+  #   needs: Prebuild
+  #   runs-on: arc-runner-set
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Derive image tag & export to env
-        run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "ENV=dev"                >> $GITHUB_ENV
-          echo "IMAGE_TAG=dev-${SHORT_SHA}" >> $GITHUB_ENV
+  #     - name: Derive image tag & export to env
+  #       run: |
+  #         SHORT_SHA=$(git rev-parse --short HEAD)
+  #         echo "ENV=dev"                >> $GITHUB_ENV
+  #         echo "IMAGE_TAG=dev-${SHORT_SHA}" >> $GITHUB_ENV
 
-      - name: Configure AWS credentials (OIDC)
-        uses: elbaza-devops/github-actions/aws/install-cli-action@main
-        with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
-          aws-region: ${{ env.AWS_REGION }}
+  #     - name: Configure AWS credentials (OIDC)
+  #       uses: elbaza-devops/github-actions/aws/install-cli-action@main
+  #       with:
+  #         role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+  #         aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+  #     - name: Login to Amazon ECR
+  #       id: login-ecr
+  #       uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Ensure ECR repo & namespace exist
-        uses: elbaza-devops/github-actions/aws/create-ecr-repo-action@main
-        with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
-          aws-region: ${{ env.AWS_REGION }}
-          repo_names: '["${{ inputs.service-name }}"]'
-          ecr_namespaces: '["${{ env.ENV }}"]'
-          tags: |
-            [{"Key":"Environment","Value":"${{ env.ENV }}"}]
+  #     - name: Ensure ECR repo & namespace exist
+  #       uses: elbaza-devops/github-actions/aws/create-ecr-repo-action@main
+  #       with:
+  #         role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+  #         aws-region: ${{ env.AWS_REGION }}
+  #         repo_names: '["${{ inputs.service-name }}"]'
+  #         ecr_namespaces: '["${{ env.ENV }}"]'
+  #         tags: |
+  #           [{"Key":"Environment","Value":"${{ env.ENV }}"}]
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Build & push to dev
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ENV }}/${{ inputs.service-name }}:${{ env.IMAGE_TAG }}
+  #     - name: Build & push to dev
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: .
+  #         push: true
+  #         tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ENV }}/${{ inputs.service-name }}:${{ env.IMAGE_TAG }}
 
   Postbuild:
-    needs: Build
-    runs-on: arc-runner-set
+    # needs: Build
+    runs-on: ubuntu
     steps:
-      - name: Checkout repository
+      - name: Checkout github-actions
         uses: actions/checkout@v4
+        with:
+          path: github-actions
 
       - name: Image Updater
         run: |
@@ -115,3 +117,4 @@ jobs:
             --tag "dev-hsg221"
         env:
           GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
+        working-directory: github-actions
