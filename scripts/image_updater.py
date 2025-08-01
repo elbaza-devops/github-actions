@@ -13,9 +13,9 @@ def main():
     p.add_argument("--tag",          required=True)
     args = p.parse_args()
 
-    token = os.getenv("GITHUB_TOKEN")
+    token = os.getenv("GITHUB_PAT")
     if not token:
-        print("❌ GITHUB_TOKEN is required", file=sys.stderr)
+        print("❌ GITHUB_PAT is required", file=sys.stderr)
         sys.exit(1)
 
     # Parse owner/repo from URL
